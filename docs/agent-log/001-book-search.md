@@ -2,7 +2,9 @@
 
 **Request:** Book search using the Open Library API (Roadmap #1).
 
-**Status:** Task 1 of 5 done. Tasks 2 to 5 are not started.
+**Status:** Tasks 1 and 2 of 5 are done. Tasks 3 to 5 are not started.
+
+**Git:** Task 1 was committed and pushed straight to `main` by mistake. From Task 2 on, each task gets its own feature branch and is merged through a PR.
 
 ## Plan
 
@@ -93,3 +95,35 @@ Charlie asked for items 1 to 5 from the list above. Item 6, splitting the test f
 **Worth remembering for later tasks (reviewer):** in production, errors thrown inside `"use cache"` come back as plain `Error`s. So an "Open Library timed out" message only reaches callers as the `cause` of "Open Library search failed", and Next may strip its text. If the error UI in Task 5 wants a separate timeout message, it can't rely on `err.message` from `searchBooks`.
 
 **Not applied:** one redundant assertion in the timeout test, `not.toBe("...invalid JSON")`.
+
+## Task 2: Book card and results list
+
+**Branch:** `feature/results-list`
+
+**Agents:** implementer → test-writer → reviewer (approved) → implementer → test-writer → reviewer (approved)
+
+**Review rounds:** 1 to approve, plus a confirmation pass after the Nice to haves were applied
+
+**Result:**
+
+- **`BookCard`** (`src/components/book-card.tsx`) is an `<article>` with an `<h3>` title.
+  - It shows a 72×108 `next/image` cover.
+  - It falls back to "Unknown author" and "Year unknown".
+  - When there is no cover it shows a "No cover" placeholder marked `aria-hidden`.
+- **`SearchResults`** (`src/components/search-results.tsx`) renders a `<ul>` of cards. Its empty state repeats the query.
+- **`next.config.ts`** allows `https://covers.openlibrary.org/b/id/**` in `images.remotePatterns`.
+- **Tests:** 73 pass.
+
+**Most interesting catch (test-writer):** the test setup wasn't cleaning up between tests.
+
+- **The problem:** Vitest globals are off, so React Testing Library can't register its automatic `cleanup`. `vitest.setup.ts` didn't call it either. Rendered DOM leaked from one test into the next, and the test-writer's first run had 9 failures because of it.
+- **Why it hadn't shown up:** `src/app/page.test.tsx` only has one test, so it had never been hit.
+- **The fix:** the test-writer worked around it in its own files and flagged the root cause instead of hiding it. The reviewer recommended a shared `afterEach(cleanup)` in `vitest.setup.ts`, and Charlie approved the change on this branch. The reviewer then ran the suite shuffled five times to confirm it holds.
+
+**Other reviewer findings:**
+
+- **Redirects confirmed:** the docs (`image.md` lines 612 and 821-833) say `next/image` follows redirects from an allowed host without checking `remotePatterns` again. So the archive.org redirect target needs no pattern of its own. This hasn't been tried against the live site yet. Check a real cover in `npm run dev` during Task 4.
+- **Config test deleted:** the test-writer's `src/next-config.test.ts` only repeated the config back, and it would have broken on any legitimate config change. Charlie chose to delete it rather than rewrite it.
+- **Cover URL test:** the cover `src` assertion built its expected value with `coverUrl` itself, so a bug in `coverUrl` would have gone unnoticed. It now checks a literal URL.
+
+**Decided for Task 4:** the `/search` page renders an `<h2>` above `SearchResults`, because card titles are `<h3>`. It does not render `SearchResults` for an empty query, which would otherwise show `No books found for ""`.
