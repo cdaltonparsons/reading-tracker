@@ -1,4 +1,5 @@
 import { cacheLife } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 
 const SEARCH_URL = "https://openlibrary.org/search.json";
@@ -7,6 +8,7 @@ const FIELDS = "key,title,author_name,first_publish_year,cover_i";
 const USER_AGENT = "ReadingTracker/0.1 (personal project)";
 const MAX_QUERY_LENGTH = 200;
 const RESULT_LIMIT = 20;
+const FETCH_TIMEOUT_MS = 8000;
 
 export class OpenLibraryError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -23,11 +25,21 @@ const searchResponseSchema = z.object({ docs: z.array(z.unknown()) });
 // Missing `title` or `key` makes the doc invalid, so it gets dropped.
 const docSchema = z
   .object({
-    key: z.string().min(1),
-    title: z.string().min(1),
-    author_name: z.array(z.string()).catch([]),
-    first_publish_year: z.number().nullable().catch(null),
-    cover_i: z.number().nullable().catch(null),
+    key: z.string().regex(/^\/works\/OL\d+W$/),
+    title: z.string().trim().min(1),
+    // Keep valid names, drop bad entries. A non-array gives [].
+    author_name: z
+      .array(z.unknown())
+      .catch([])
+      .transform((names) =>
+        names
+          .filter((name): name is string => typeof name === "string")
+          .map((name) => name.trim())
+          .filter((name) => name !== ""),
+      ),
+    first_publish_year: z.number().int().nullable().catch(null),
+    // Goes into a URL via coverUrl, so it must be a positive integer.
+    cover_i: z.number().int().positive().nullable().catch(null),
   })
   .transform((doc) => ({
     id: doc.key,
@@ -41,7 +53,7 @@ export type Book = z.output<typeof docSchema>;
 
 export function normalizeQuery(raw: string | string[] | undefined): string {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  return (value ?? "").trim().slice(0, MAX_QUERY_LENGTH);
+  return (value ?? "").trim().slice(0, MAX_QUERY_LENGTH).trim();
 }
 
 export function parseSearchResponse(json: unknown): Book[] {
@@ -59,11 +71,41 @@ export function parseSearchResponse(json: unknown): Book[] {
   return books;
 }
 
-export async function searchBooks(query: string): Promise<Book[]> {
+// Uncached wrapper around the cached `fetchSearch`. It exists for two reasons:
+// (a) Errors thrown inside a "use cache" scope are rebuilt as plain Errors in
+//     production, so wrapping into OpenLibraryError must happen outside it.
+// (b) Normalising the query before the cached call keeps cache keys
+//     consistent ("  dune " and "dune" share an entry). Do not move
+//     `normalizeQuery` into `fetchSearch`.
+export async function searchBooks(raw: string): Promise<Book[]> {
+  const query = normalizeQuery(raw);
+  if (query === "") return [];
+  try {
+    return await fetchSearch(query);
+  } catch (cause) {
+    // Let Next control-flow errors (notFound, redirect, dynamic bailouts) pass.
+    unstable_rethrow(cause);
+    throw cause instanceof OpenLibraryError
+      ? cause
+      : new OpenLibraryError("Open Library search failed", { cause });
+  }
+}
+
+const TIMEOUT_MESSAGE = "Open Library timed out";
+
+// AbortSignal.timeout() aborts with a DOMException named "TimeoutError".
+function isTimeout(cause: unknown): boolean {
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    "name" in cause &&
+    cause.name === "TimeoutError"
+  );
+}
+
+async function fetchSearch(query: string): Promise<Book[]> {
   "use cache";
   cacheLife("hours");
-
-  if (query === "") return [];
 
   const url = new URL(SEARCH_URL);
   url.searchParams.set("q", query);
@@ -74,9 +116,12 @@ export async function searchBooks(query: string): Promise<Book[]> {
   try {
     response = await fetch(url.toString(), {
       headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch (cause) {
-    throw new OpenLibraryError("Could not reach Open Library", { cause });
+    throw isTimeout(cause)
+      ? new OpenLibraryError(TIMEOUT_MESSAGE, { cause })
+      : new OpenLibraryError("Could not reach Open Library", { cause });
   }
   if (!response.ok) {
     throw new OpenLibraryError(`Open Library returned ${response.status}`);
@@ -86,7 +131,10 @@ export async function searchBooks(query: string): Promise<Book[]> {
   try {
     json = await response.json();
   } catch (cause) {
-    throw new OpenLibraryError("Open Library returned invalid JSON", { cause });
+    // The abort signal also covers reading the body.
+    throw isTimeout(cause)
+      ? new OpenLibraryError(TIMEOUT_MESSAGE, { cause })
+      : new OpenLibraryError("Open Library returned invalid JSON", { cause });
   }
   return parseSearchResponse(json);
 }
