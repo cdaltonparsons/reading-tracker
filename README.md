@@ -33,10 +33,11 @@ Every feature run is written up in [`docs/agent-log/`](docs/agent-log/), includi
 
 ## What I learned
 
-<!-- TODO(Charlie): fill this in as you go, in your own words. Good prompts:
-     What did the reviewer catch that you would have missed?
-     Where did the agents go wrong, and how did you change their instructions?
-     When was one agent better than several? -->
+- the review agent and test agent seem to be much more reliable than a single agent workflow.  Both found high priority fixes in their first pass.
+
+- The review agent LOVES making suggestions.  I need to work on finetuning it so that it won't ALWAYS turn up a bunch of potential improvements. That could maybe split out into a 'shine and polish' agent or something similar
+
+- Task two was relatively straightforward with the addition of some fairly basic componentry.  The agents seemed to have done a bang-up job.
 
 _In progress. I add to this after each feature._
 
