@@ -2,7 +2,7 @@
 
 **Request:** Book search using the Open Library API (Roadmap #1).
 
-**Status:** Tasks 1 and 2 of 5 are done. Tasks 3 to 5 are not started.
+**Status:** Tasks 1 to 3 of 5 are done. Tasks 4 and 5 are not started.
 
 **Git:** Task 1 was committed and pushed straight to `main` by mistake. From Task 2 on, each task gets its own feature branch and is merged through a PR.
 
@@ -127,3 +127,48 @@ Charlie asked for items 1 to 5 from the list above. Item 6, splitting the test f
 - **Cover URL test:** the cover `src` assertion built its expected value with `coverUrl` itself, so a bug in `coverUrl` would have gone unnoticed. It now checks a literal URL.
 
 **Decided for Task 4:** the `/search` page renders an `<h2>` above `SearchResults`, because card titles are `<h3>`. It does not render `SearchResults` for an empty query, which would otherwise show `No books found for ""`.
+
+## Task 3: Search form
+
+**Branch:** `feature/book-shelf`
+
+**Agents:** implementer (stopped) → implementer → test-writer → reviewer (changes requested) → implementer → test-writer → reviewer (approved)
+
+**Review rounds:** 2
+
+**Result:**
+
+- `SearchForm` (`src/components/search-form.tsx`) is a Server Component built on `next/form`. It renders `<Form action="/search" role="search">`.
+- The search input:
+  - has the sr-only label "Search books"
+  - is `name="q"` and `type="search"`
+  - has `maxLength={200}`, matching `normalizeQuery`
+  - takes an optional `defaultQuery`
+- The input deliberately has no `required` attribute. The page has to handle empty queries anyway, because `required` accepts `"   "`, and users can open `/search` directly.
+- `next/form` renders in jsdom without any mocking.
+- **Tests:** 84 pass.
+
+**Most interesting catch (reviewer, round 1):** the search box would show a stale query.
+
+- **The bug:** the App Router re-renders the same page in place when you go from `/search?q=a` to `/search?q=b`, including on Back and Forward. So `SearchForm` is not remounted. An uncontrolled input only takes a new `defaultValue` if the user hasn't typed in it yet. So if you search "a", type "b", submit, then press Back, the results show "a" but the box still says "b".
+- **Who spotted it:** the orchestrator suspected this and asked the reviewer to check. The reviewer confirmed it by reasoning through how React and HTML handle this.
+- **The fix:** `key={defaultQuery ?? ""}` on the input. The key goes on the input, not on `<Form>`, because the `next/form` docs say a `key` on a string-action `<Form>` isn't supported.
+- **Proving the test works:** the test-writer showed that jsdom reproduces the bug. In a scratch test, an input without the key kept "typed" when it should have shown "c". So the new regression test really does prove the fix.
+
+**What went wrong:**
+
+- **Files moved by accident:** the first implementer run was stopped. While it was running, Charlie had accidentally dragged the Task 2 components into `src/app/components/`, and that implementer put its partial `search-form.tsx` there too. Charlie moved the files back and discarded the partial file, and Task 3 was restarted. This happened when Charlie stopped to ask why book search was "being built again". The confusion came from two places:
+  - The orchestrator's "Task 1/Task 2" labels were easy to read as features.
+  - `docs/ROADMAP.md` still said "Not started".
+
+  Fixes:
+  - The roadmap now says "In progress".
+  - `/build-feature` now updates the roadmap at the start and end of each feature.
+- **Session ended mid-review:** the round 1 review stopped when the session ended. It was resumed from its saved transcript.
+- **The reviewer contradicted itself:** in round 1, the reviewer quoted the docs on `key` and `<Form>`. In round 2, it called the code comment that says the same thing "wrong". The orchestrator checked `form.md` (line 156), which confirms the comment is right, so that suggestion was not applied.
+
+**Also applied (Charlie approved):**
+
+- `outline-hidden` instead of `outline-none`, so the focus outline still shows in Windows High Contrast mode.
+- `border-zinc-500` for 3:1 border contrast. The implementer also changed the focus border to `zinc-700`.
+- Removed two low-value tests.
