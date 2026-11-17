@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import { SearchForm } from "./search-form";
@@ -13,6 +13,9 @@ describe("SearchForm", () => {
     const form = screen.getByRole("search");
     expect(form.tagName).toBe("FORM");
     expect(form.getAttribute("action")).toBe("/search");
+    const button = screen.getByRole("button", { name: "Search" });
+    expect(button.getAttribute("type")).toBe("submit");
+    expect(form.contains(button)).toBe(true);
   });
 
   it("renders a labelled search input named q", () => {
@@ -29,60 +32,37 @@ describe("SearchForm", () => {
     expect(input.required).toBe(false);
   });
 
-  it("renders a submit button inside the form", () => {
-    render(<SearchForm />);
-    const button = screen.getByRole("button", { name: "Search" });
-    expect(button.getAttribute("type")).toBe("submit");
-    expect(screen.getByRole("search").contains(button)).toBe(true);
-  });
-
-  it("is empty when defaultQuery is omitted", () => {
+  it("is empty and uncontrolled with no props", () => {
     render(<SearchForm />);
     expect(getInput().value).toBe("");
+    fireEvent.change(getInput(), { target: { value: "typed" } });
+    expect(getInput().value).toBe("typed");
   });
 
-  it("pre-fills the input from defaultQuery", () => {
-    render(<SearchForm defaultQuery="dune" />);
+  it("shows the value it is given", () => {
+    render(<SearchForm value="dune" onChange={() => {}} />);
     expect(getInput().value).toBe("dune");
   });
 
-  it("is empty for an empty-string defaultQuery", () => {
-    render(<SearchForm defaultQuery="" />);
-    expect(getInput().value).toBe("");
+  it("is controlled: the input follows value, not what was typed", () => {
+    const { rerender } = render(<SearchForm value="a" onChange={() => {}} />);
+    fireEvent.change(getInput(), { target: { value: "typed" } });
+    expect(getInput().value).toBe("a");
+    rerender(<SearchForm value="c" onChange={() => {}} />);
+    expect(getInput().value).toBe("c");
   });
 
-  it("serializes the entered value under q", () => {
-    render(<SearchForm defaultQuery="emma" />);
-    const data = new FormData(screen.getByRole("search") as HTMLFormElement);
-    expect(data.get("q")).toBe("emma");
+  it("calls onChange when the user types", () => {
+    const onChange = vi.fn();
+    render(<SearchForm value="" onChange={onChange} />);
+    fireEvent.change(getInput(), { target: { value: "x" } });
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
-  describe("when defaultQuery changes on re-render", () => {
-    it("replaces text the user typed with the new defaultQuery", () => {
-      const { rerender } = render(<SearchForm defaultQuery="a" />);
-      fireEvent.change(getInput(), { target: { value: "typed" } });
-      expect(getInput().value).toBe("typed");
-
-      rerender(<SearchForm defaultQuery="c" />);
-      expect(getInput().value).toBe("c");
-    });
-
-    it("keeps what the user typed when defaultQuery is unchanged", () => {
-      const { rerender } = render(<SearchForm defaultQuery="a" />);
-      const before = getInput();
-      fireEvent.change(before, { target: { value: "typed" } });
-
-      rerender(<SearchForm defaultQuery="a" />);
-      expect(getInput()).toBe(before);
-      expect(getInput().value).toBe("typed");
-    });
-
-    it("clears the input when defaultQuery goes from a value to undefined", () => {
-      const { rerender } = render(<SearchForm defaultQuery="a" />);
-      fireEvent.change(getInput(), { target: { value: "typed" } });
-
-      rerender(<SearchForm />);
-      expect(getInput().value).toBe("");
-    });
+  it("calls onSubmit when the form is submitted", () => {
+    const onSubmit = vi.fn();
+    render(<SearchForm onSubmit={onSubmit} />);
+    fireEvent.submit(screen.getByRole("search"));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

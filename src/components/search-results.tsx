@@ -10,7 +10,7 @@ export function SearchResults({
 }) {
   if (books.length === 0) {
     return (
-      <p className="text-zinc-600">
+      <p className="text-zinc-600 wrap-anywhere">
         No books found for &ldquo;{query}&rdquo;. Try a different title or
         author.
       </p>

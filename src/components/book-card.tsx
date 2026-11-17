@@ -26,8 +26,8 @@ export function BookCard({ book }: { book: Book }) {
         />
       )}
       <div className="min-w-0">
-        <h3 className="font-semibold">{book.title}</h3>
-        <p className="text-sm text-zinc-600">{authors}</p>
+        <h3 className="font-semibold wrap-anywhere">{book.title}</h3>
+        <p className="text-sm text-zinc-600 wrap-anywhere">{authors}</p>
         <p className="text-sm text-zinc-500">{year}</p>
       </div>
     </article>

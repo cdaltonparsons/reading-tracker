@@ -2,7 +2,7 @@
 
 **Request:** Book search using the Open Library API (Roadmap #1).
 
-**Status:** Tasks 1 to 3 of 5 are done. Tasks 4 and 5 are not started.
+**Status:** Tasks 1 to 4 of 5 are done. Task 5 is not started.
 
 **Git:** Task 1 was committed and pushed straight to `main` by mistake. From Task 2 on, each task gets its own feature branch and is merged through a PR.
 
@@ -172,3 +172,112 @@ Charlie asked for items 1 to 5 from the list above. Item 6, splitting the test f
 - `outline-hidden` instead of `outline-none`, so the focus outline still shows in Windows High Contrast mode.
 - `border-zinc-500` for 3:1 border contrast. The implementer also changed the focus border to `zinc-700`.
 - Removed two low-value tests.
+
+## Task 4: `/search` page
+
+**Branch:** `feature/search-form`. It is stacked on the unmerged Task 3 branch, because Charlie is holding the PRs until the feature is complete.
+
+**Agents:**
+
+1. implementer → test-writer → reviewer (changes requested), with a reviewer test audit running in parallel
+2. implementer, plus a second implementer for the heading wrap → test-writer → reviewer (approved) → test-writer (cleanup)
+3. **verifier round 1 (FAIL)** → implementer → test-writer → reviewer (changes requested) → implementer → test-writer → reviewer (approved)
+4. **verifier round 2 (FAIL)** → Charlie approved a third round → implementer (redesign) → test-writer → reviewer (changes requested) → implementer → test-writer → reviewer (approved)
+5. **verifier round 3 (PASS)**
+
+**Review rounds:** 2 before the verifier existed, then 2 more for each verifier failure. **Verifier rounds:** 3. That is one over the limit, with Charlie's approval.
+
+**Result:**
+
+- **Page and layout:**
+  - `src/app/search/layout.tsx` holds the `<h1>` and the search form, so the form persists across searches.
+  - `src/app/search/page.tsx` only renders the results.
+  - Neither is async, so the `<h1>` is part of the prerendered shell, and the build reports `/search` as `◐ Partial Prerender`.
+- **The search box:**
+  - It shows an empty `SearchForm` until `SearchBox` takes over.
+  - `SearchBox` is a `"use client"` controlled input. It reads `q` with `useSearchParams()` and keeps the user's text if they edited it after submitting.
+- **The results:** the page shows `ResultsSkeleton` until `Results` is ready. `Results` is an async Server Component that shows a prompt for an empty query, or an `<h2>` "Results for “…”" followed by `SearchResults`.
+- **The search button:** `SearchButton` uses `useFormStatus` to show "Searching…" during a search, plus an sr-only `role="status"`.
+- **Shared query code:** `normalizeQuery` moved to a client-safe `src/lib/query.ts`, and `open-library.ts` re-exports it.
+- **Live check:** the implementer ran `next start` against the real API. `/search?q=dune` returned 20 results, and a cover image loaded through `/_next/image` with a 200. That confirms the Task 2 assumption that the archive.org redirect needs no extra `remotePatterns` entry.
+- **Tests:** 88 pass. The audit below cut 106 down to 72, and the verifier fixes then added tests.
+
+**Most interesting catch (reviewer, round 1):** the search box went blank on every search.
+
+- **The cause:** the first version filled the box from a Server Component, `QueryForm`, which read `searchParams`. Next's docs (`optimizing-the-static-shell.md`, Step 5) say server content that depends on `searchParams` isn't part of the shared shell during client navigation. So every submit showed the empty fallback form for a full server round trip, then filled it back in.
+- **The fix:** read the query on the client with `useSearchParams()`, which the docs say resolves synchronously during client navigation.
+- **Why the tests missed it:** they render components in isolation, so they can't see navigation behaviour.
+- **What the orchestrator asked:** whether text typed into the fallback form would be lost during the swap. The reviewer said yes, because React mounts the resolved content as a new subtree. After the fix, that only matters during the first page load.
+
+**The test audit:** Charlie asked whether 106 tests was really justified for this much functionality. A separate reviewer audited every test with one question: what realistic regression would make this test fail, and would another test already catch it? It found about 38 tests not earning their place:
+
+- **About 12 tested libraries instead of our code:** React's escaping, Zod rejecting non-objects, jsdom's `FormData`.
+- **About 6 repeated `normalizeQuery` tests:** it was tested at three separate layers.
+- **About 5 restated the markup:** "is an `<article>`", "heading before form".
+- **The rest:** duplicates, and tests of implementation details such as "`unstable_rethrow` was called" or "`cacheLife('hours')`".
+
+Charlie approved every cut and merge, including the judgement calls. The core stayed:
+
+- the `searchBooks` error and timeout paths
+- per-doc schema validation
+- the keyed-input regression tests
+- the static-shell check
+
+The new tests for `CurrentQueryForm` and the real Suspense skeleton made up for the cuts. The audit also found that the year-0 test's comment was wrong. The schema does accept year 0, so that guard was worth keeping.
+
+**What went wrong:**
+
+- **The audit and the fix ran at the same time.** The refactor changed the code while the audit was reading it. The audit noticed, noted which findings it affected, and the orchestrator held the test-writer back so it could do the fix and the cuts in one pass.
+- **A broken build in the meantime.** The implementer wasn't allowed to edit tests, so the repo failed typecheck until the test-writer caught up. To verify the build, the implementer made a 569 MB copy of the repo in the scratchpad. The orchestrator deleted it afterwards.
+- **A leftover test-output file.** A vitest JSON report (`.vitest/json/output.json`) was left in the repo by an agent's test run. The reviewer flagged it and the orchestrator deleted it.
+- **A deviation caught in review.** The test-writer kept two explicit-null rows that Charlie had approved cutting, by folding them into a merged table. The reviewer caught this, and the rows were removed.
+
+**Also applied (Charlie approved):** `wrap-anywhere` on the results `<h2>`, so a long query with no spaces wraps instead of overflowing on mobile.
+
+### Browser verification
+
+Midway through Task 4, Charlie added a new agent, the **`verifier`**. It builds the app, starts it on port 3100 and drives real user flows in headless Chromium with Playwright. It's read-only, like the reviewer. Playwright was added as a dev dependency. Every agent had missed the bugs below, because unit tests render components in isolation and can't see navigation, timing or layout.
+
+**Round 1 (FAIL):**
+
+- **What passed:** the round 1 reviewer fix held up. The box never went blank or stale across searching, searching again, Back, Forward, and typing then pressing Back. It sampled the box every 50 ms.
+- **The failure:** at 375 px, a 200-character query with no spaces and no results made the page 1819 px wide. The "No books found" message couldn't wrap. `<main>` (`mx-auto` inside a `flex flex-col` body) sized itself to its content.
+  - **Fix:** `wrap-anywhere` on that message and on the book card text, and `w-full` on `<main>`.
+- **A note that wasn't a failure:** new searches showed no loading feedback for 3 to 5 seconds, because the skeleton only appears on a direct page load. Charlie chose to fix it with a `useFormStatus` pending button.
+- **A bug the reviewer caught in that button:** the first version blocked repeat clicks while pending. Pressing Enter in a field clicks the default submit button, so the guard also blocked Enter. That silently dropped a corrected search, and the user's edit was then wiped when the earlier search finished. The guard was removed, since a repeat GET navigation is harmless.
+
+**Round 2 (FAIL):**
+
+- **What passed:** overflow, the pending state, and a correction submitted before the first search finished.
+- **The failure:** if the first search *finished while the user was still typing* a correction, the box was wiped to the old query and focus moved to `<body>`. Every remaining keystroke went nowhere, and spaces scrolled the page.
+- **The cause:** Task 3's own fix, `key={defaultQuery}` on the input, which remounted it on every query change. That same key is why focus had always left the box after a search.
+- **What it took to fix:** this was the second verifier failure, which hit the round limit. Charlie chose to fix it in Task 4 rather than as a separate task.
+  - The form moved into a persistent `layout.tsx`. Layouts don't re-render when only `searchParams` change.
+  - The input became a controlled `SearchBox` that tracks "submitted" and "edited since submit".
+  - The reviewer's round on the redesign caught one more case. A submit that only changed whitespace (`"  dune "` on `?q=dune`) left the raw text in the box, because the normalised query didn't change.
+
+**Round 3 (PASS):**
+
+- The correction-while-finishing case passed. Over 56 samples the box only showed what the user typed, focus stayed on the same input element throughout, and Enter submitted the correction.
+- Focus after a plain search, Back and Forward over unsubmitted text, the whitespace resubmit, and the earlier fixes also passed.
+
+### Process change: the backlog
+
+During this task, Charlie noticed that reviewer "Nice to have" items were growing every task. Each one became another round.
+
+- **New file:** `docs/BACKLOG.md` now holds those follow-ups.
+- **Reviewer:** its definition has "Must fix" for real defects only (unmet criteria, bugs, security, broken conventions, failing checks) and "Backlog" for everything else. It reads the backlog first to avoid repeating items.
+- **`/build-feature`:** now says Backlog items are never applied during a task, and the orchestrator doesn't ask about each one.
+- **Seeding:** the backlog started with 7 earlier unapplied suggestions. By the end of the task it had 12 open items, and one was done (focus after a search).
+
+**What went wrong (continued):**
+
+- **Session restarts stopped agents twice.** Each time the agent resumed from its saved transcript. The second time, the verifier had left `next start` running on port 3100. The orchestrator checked the process was the verifier's before stopping it.
+- **Flaky upstream connections.** The verifier saw three `ECONNRESET` errors from Open Library in about 15 searches, each on the first call after a quiet minute. They didn't affect the verdict and are now in the backlog as "retry once".
+- **A bigger PR.** Task 4 grew well beyond its plan. It now includes the verifier agent, Playwright, the backlog change, and a redesign of Task 3's input. Charlie chose to keep it all on one branch.
+
+**Decided for Task 5:** Charlie chose to wrap only the results in a `catchError` boundary from `next/error`, instead of using a segment-level `error.tsx`. That way the heading and search box stay visible when Open Library fails. Things to remember when building it:
+
+- **Put the boundary in `page.tsx`, around `<Results>`, not in the layout.** `catchError` only resets on navigation to a different route. The page remounts on every query change and the layout doesn't, so a boundary in the layout could keep showing an old error after a new search. (From the reviewer, round 3.)
+- **Don't build UI that relies on the timeout message.** In production, the error only reaches the page as "Open Library search failed". (Task 1 note.)
+- **Test it with the verifier.** An upstream failure currently shows Next's generic "This page couldn't load" screen, plus React error #441 in the console.

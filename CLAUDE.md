@@ -12,10 +12,11 @@ Features are built with the `/build-feature` command, which runs the subagents i
 - `implementer` writes application code for one task
 - `test-writer` writes tests and never touches app code
 - `reviewer` reviews the diff and returns APPROVE or CHANGES REQUESTED
+- `verifier` runs the app in a headless browser (Playwright), checks the real user flows for UI tasks, and returns PASS or FAIL
 
 The human (Charlie) reviews every change in their IDE and makes every commit. **No agent ever runs `git commit`, `git push`, or opens a pull request.**
 
-Each feature run is written up in `docs/agent-log/`. The planned features are in `docs/ROADMAP.md`.
+Each feature run is written up in `docs/agent-log/`. The planned features are in `docs/ROADMAP.md`. Smaller follow-ups found during runs go in `docs/BACKLOG.md`. They are not done as part of the task where they came up.
 
 ## Stack
 
