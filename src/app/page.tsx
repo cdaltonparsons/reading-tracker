@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="mx-auto flex w-full min-h-screen max-w-3xl flex-col gap-4 px-6 py-24">
@@ -7,6 +9,12 @@ export default function Home() {
         finished. Features are on the way, built one at a time by a team of
         AI subagents.
       </p>
+      <Link
+        href="/search"
+        className="w-fit font-medium underline underline-offset-4"
+      >
+        Search books
+      </Link>
     </main>
   );
 }

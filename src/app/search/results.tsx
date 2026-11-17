@@ -1,5 +1,7 @@
-import { SearchResults } from "@/components/search-results";
-import { normalizeQuery, searchBooks } from "@/lib/open-library";
+import { Suspense } from "react";
+import { ResultsErrorBoundary } from "@/components/results-error-boundary";
+import { BookResults } from "@/components/book-results";
+import { normalizeQuery } from "@/lib/open-library";
 
 type Props = Pick<PageProps<"/search">, "searchParams">;
 
@@ -14,12 +16,15 @@ export async function Results({ searchParams }: Props) {
     );
   }
 
-  const books = await searchBooks(q);
+  // Keyed on the query: catchError only clears on a pathname change, and a
+  // search-params-only navigation keeps this segment mounted, so a new query
+  // needs a fresh boundary instance to drop a previous error.
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold wrap-anywhere">Results for “{q}”</h2>
-      <SearchResults books={books} query={q} />
-    </section>
+    <ResultsErrorBoundary key={q}>
+      <Suspense fallback={<ResultsSkeleton />}>
+        <BookResults q={q} />
+      </Suspense>
+    </ResultsErrorBoundary>
   );
 }
 
