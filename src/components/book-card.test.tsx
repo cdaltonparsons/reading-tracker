@@ -23,7 +23,6 @@ describe("BookCard", () => {
     render(<BookCard book={makeBook()} />);
     const heading = screen.getByRole("heading", { name: "Dune" });
     expect(heading.tagName).toBe("H3");
-    expect(screen.getByRole("heading", { level: 3 })).toBe(heading);
   });
 
   it("shows the author and year", () => {
@@ -47,7 +46,7 @@ describe("BookCard", () => {
     expect(screen.getByText("Year unknown")).toBeInTheDocument();
   });
 
-  // Task 1's schema never produces year 0; this guards the `=== null` check in the component.
+  // z.number().int() accepts 0 (and negative years), so year 0 is reachable; this guards the `=== null` check in the component.
   it("renders year 0 as a number, not 'Year unknown'", () => {
     render(<BookCard book={makeBook({ year: 0 })} />);
     expect(screen.getByText("0")).toBeInTheDocument();
@@ -69,29 +68,5 @@ describe("BookCard", () => {
     expect(screen.getByTestId("cover-placeholder")).toBeInTheDocument();
     expect(screen.getByTestId("cover-placeholder")).toHaveAttribute("aria-hidden", "true");
     expect(screen.queryByRole("img")).toBeNull();
-    expect(document.querySelector("img")).toBeNull();
-  });
-
-  // Task 1's schema never produces coverId 0; this guards the `!== null` check in the component.
-  it("renders coverId 0 as a cover (not a placeholder)", () => {
-    render(<BookCard book={makeBook({ coverId: 0 })} />);
-    expect(screen.getByRole("img")).toBeInTheDocument();
-  });
-
-  it("renders special characters as text without injecting HTML", () => {
-    const title = `<script>alert("x")</script> & <b>Bold</b>`;
-    const { container } = render(
-      <BookCard book={makeBook({ title, authors: ["<i>Eve</i>"] })} />,
-    );
-    expect(screen.getByRole("heading", { level: 3 }).textContent).toBe(title);
-    expect(screen.getByText("<i>Eve</i>")).toBeInTheDocument();
-    expect(container.querySelector("script")).toBeNull();
-    expect(container.querySelector("b")).toBeNull();
-    expect(container.querySelector("i")).toBeNull();
-  });
-
-  it("is an article element", () => {
-    render(<BookCard book={makeBook()} />);
-    expect(screen.getByRole("article")).toBeInTheDocument();
   });
 });

@@ -1,12 +1,15 @@
 import { cacheLife } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
+import { normalizeQuery } from "./query";
+
+// Re-exported so existing imports keep working.
+export { normalizeQuery };
 
 const SEARCH_URL = "https://openlibrary.org/search.json";
 const COVERS_URL = "https://covers.openlibrary.org/b/id";
 const FIELDS = "key,title,author_name,first_publish_year,cover_i";
 const USER_AGENT = "ReadingTracker/0.1 (personal project)";
-const MAX_QUERY_LENGTH = 200;
 const RESULT_LIMIT = 20;
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -50,11 +53,6 @@ const docSchema = z
   }));
 
 export type Book = z.output<typeof docSchema>;
-
-export function normalizeQuery(raw: string | string[] | undefined): string {
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  return (value ?? "").trim().slice(0, MAX_QUERY_LENGTH).trim();
-}
 
 export function parseSearchResponse(json: unknown): Book[] {
   const envelope = searchResponseSchema.safeParse(json);

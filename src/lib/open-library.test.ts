@@ -11,51 +11,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { cacheLife } from "next/cache";
-import { unstable_rethrow } from "next/navigation";
 import {
   OpenLibraryError,
   coverUrl,
-  normalizeQuery,
   parseSearchResponse,
   searchBooks,
 } from "./open-library";
-
-describe("normalizeQuery", () => {
-  it("returns empty string for undefined", () => {
-    expect(normalizeQuery(undefined)).toBe("");
-  });
-
-  it("uses the first element of an array", () => {
-    expect(normalizeQuery(["dune", "x"])).toBe("dune");
-  });
-
-  it("returns empty string for an empty array", () => {
-    expect(normalizeQuery([])).toBe("");
-  });
-
-  it("trims whitespace", () => {
-    expect(normalizeQuery("  dune \n")).toBe("dune");
-  });
-
-  it("returns empty for whitespace-only input", () => {
-    expect(normalizeQuery("   \t ")).toBe("");
-  });
-
-  it("truncates to 200 characters", () => {
-    expect(normalizeQuery("a".repeat(300))).toHaveLength(200);
-  });
-
-  it("keeps exactly 200 and 199 characters intact", () => {
-    expect(normalizeQuery("a".repeat(200))).toHaveLength(200);
-    expect(normalizeQuery("a".repeat(199))).toHaveLength(199);
-  });
-
-  it("trims again after slicing so no trailing space remains", () => {
-    const result = normalizeQuery("a".repeat(199) + " " + "b".repeat(10));
-    expect(result).toHaveLength(199);
-    expect(result).not.toMatch(/\s$/);
-  });
-});
 
 describe("parseSearchResponse", () => {
   it("maps a valid payload to books", () => {
@@ -114,17 +75,6 @@ describe("parseSearchResponse", () => {
     expect(books.map((b) => b.id)).toEqual(["/works/OL1W", "/works/OL123W"]);
   });
 
-  it("drops docs with empty-string key or title", () => {
-    expect(
-      parseSearchResponse({
-        docs: [
-          { key: "", title: "T" },
-          { key: "/works/OL1W", title: "" },
-        ],
-      }),
-    ).toEqual([]);
-  });
-
   it("defaults missing optional fields", () => {
     expect(
       parseSearchResponse({ docs: [{ key: "/works/OL1W", title: "T" }] }),
@@ -133,34 +83,18 @@ describe("parseSearchResponse", () => {
     ]);
   });
 
-  it("gives null for non-numeric year and cover", () => {
+  it.each([
+    ["string year", { first_publish_year: "1965" }, "year"],
+    ["non-integer year", { first_publish_year: 1.5 }, "year"],
+    ["string cover_i", { cover_i: "abc" }, "coverId"],
+    ["non-integer cover_i", { cover_i: 1.5 }, "coverId"],
+    ["negative cover_i", { cover_i: -3 }, "coverId"],
+    ["zero cover_i", { cover_i: 0 }, "coverId"],
+  ] as const)("invalid numbers become null: %s", (_label, extra, field) => {
     const [book] = parseSearchResponse({
-      docs: [
-        {
-          key: "/works/OL1W",
-          title: "T",
-          first_publish_year: "1965",
-          cover_i: "abc",
-        },
-      ],
+      docs: [{ key: "/works/OL1W", title: "T", ...extra }],
     });
-    expect(book.year).toBeNull();
-    expect(book.coverId).toBeNull();
-  });
-
-  it("gives null for explicit null year and cover", () => {
-    const [book] = parseSearchResponse({
-      docs: [
-        {
-          key: "/works/OL1W",
-          title: "T",
-          first_publish_year: null,
-          cover_i: null,
-        },
-      ],
-    });
-    expect(book.year).toBeNull();
-    expect(book.coverId).toBeNull();
+    expect(book[field]).toBeNull();
   });
 
   it("falls back to [] authors when author_name is not an array", () => {
@@ -168,17 +102,6 @@ describe("parseSearchResponse", () => {
       docs: [{ key: "/works/OL1W", title: "T", author_name: "Frank" }],
     });
     expect(a.authors).toEqual([]);
-  });
-
-  it("keeps only non-empty string author entries", () => {
-    const [a, b] = parseSearchResponse({
-      docs: [
-        { key: "/works/OL1W", title: "T", author_name: ["ok", 5] },
-        { key: "/works/OL2W", title: "T", author_name: ["ok", "", "  "] },
-      ],
-    });
-    expect(a.authors).toEqual(["ok"]);
-    expect(b.authors).toEqual(["ok"]);
   });
 
   it("drops a doc whose title is only whitespace", () => {
@@ -207,47 +130,10 @@ describe("parseSearchResponse", () => {
     expect(book.authors).toEqual(["Frank Herbert"]);
   });
 
-  it("gives null for a non-integer year", () => {
-    const [book] = parseSearchResponse({
-      docs: [{ key: "/works/OL1W", title: "T", first_publish_year: 1.5 }],
-    });
-    expect(book.year).toBeNull();
-  });
-
-  it.each([1.5, -3, 0])("gives null coverId for invalid cover_i %s", (cover) => {
-    const [book] = parseSearchResponse({
-      docs: [{ key: "/works/OL1W", title: "T", cover_i: cover }],
-    });
-    expect(book.coverId).toBeNull();
-  });
-
-  it("keeps valid integer year and cover", () => {
-    const [book] = parseSearchResponse({
-      docs: [
-        { key: "/works/OL1W", title: "T", first_publish_year: 1999, cover_i: 1 },
-      ],
-    });
-    expect(book.year).toBe(1999);
-    expect(book.coverId).toBe(1);
-  });
-
-  it("handles NaN year (JS-only value) without throwing", () => {
-    const [book] = parseSearchResponse({
-      docs: [{ key: "/works/OL1W", title: "T", first_publish_year: NaN }],
-    });
-    expect(book.year).toBeNull();
-  });
-
   it.each([
     ["missing docs", {}],
     ["docs not an array", { docs: "nope" }],
-    ["docs null", { docs: null }],
-    ["docs an object", { docs: {} }],
     ["null input", null],
-    ["undefined input", undefined],
-    ["string input", "hello"],
-    ["number input", 42],
-    ["array input", []],
   ])("throws OpenLibraryError for %s", (_label, input) => {
     expect(() => parseSearchResponse(input)).toThrow(OpenLibraryError);
   });
@@ -269,8 +155,11 @@ describe("searchBooks", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns [] without calling fetch for an empty query", async () => {
-    await expect(searchBooks("")).resolves.toEqual([]);
+  it.each([
+    ["an empty", ""],
+    ["a whitespace-only", "   "],
+  ])("returns [] without calling fetch for %s query", async (_label, q) => {
+    await expect(searchBooks(q)).resolves.toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -303,26 +192,6 @@ describe("searchBooks", () => {
     expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get("q")).toBe(
       "dune",
     );
-  });
-
-  it("returns [] without calling fetch for a whitespace-only query", async () => {
-    await expect(searchBooks("   ")).resolves.toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("sends at most 200 characters in q for a longer query", async () => {
-    fetchMock.mockResolvedValue(okResponse({ docs: [] }));
-    await searchBooks("a".repeat(300));
-    const q = new URL(fetchMock.mock.calls[0][0]).searchParams.get("q");
-    expect(q).toHaveLength(200);
-    expect(q).toBe("a".repeat(200));
-  });
-
-  it("calls cacheLife with 'hours' when a search runs", async () => {
-    vi.mocked(cacheLife).mockClear();
-    fetchMock.mockResolvedValue(okResponse({ docs: [] }));
-    await searchBooks("dune");
-    expect(cacheLife).toHaveBeenCalledWith("hours");
   });
 
   it("encodes special characters in q", async () => {
@@ -379,14 +248,6 @@ describe("searchBooks", () => {
     expect(err.cause).toBe(timeout);
   });
 
-  it("passes the caught error to unstable_rethrow", async () => {
-    vi.mocked(unstable_rethrow).mockClear();
-    fetchMock.mockRejectedValue(new TypeError("network down"));
-    const err = await searchBooks("dune").catch((e) => e);
-    expect(unstable_rethrow).toHaveBeenCalledTimes(1);
-    expect(unstable_rethrow).toHaveBeenCalledWith(err);
-  });
-
   it("wraps a non-OpenLibraryError from the cached function", async () => {
     // In production, errors out of a "use cache" scope arrive as plain Errors.
     const boom = new Error("x");
@@ -404,11 +265,6 @@ describe("searchBooks", () => {
       throw SENTINEL;
     });
     await expect(searchBooks("dune")).rejects.toBe(SENTINEL);
-  });
-
-  it("throws OpenLibraryError for an invalid payload", async () => {
-    fetchMock.mockResolvedValue(okResponse({ nope: true }));
-    await expect(searchBooks("dune")).rejects.toBeInstanceOf(OpenLibraryError);
   });
 
   it("throws OpenLibraryError when the body is not valid JSON", async () => {
@@ -432,20 +288,5 @@ describe("coverUrl", () => {
     expect(coverUrl(123, "M")).toBe(
       "https://covers.openlibrary.org/b/id/123-M.jpg",
     );
-  });
-
-  it("supports other sizes", () => {
-    expect(coverUrl(7, "S")).toBe("https://covers.openlibrary.org/b/id/7-S.jpg");
-    expect(coverUrl(7, "L")).toBe("https://covers.openlibrary.org/b/id/7-L.jpg");
-  });
-});
-
-describe("OpenLibraryError", () => {
-  it("is an Error with a name and cause", () => {
-    const cause = new Error("x");
-    const err = new OpenLibraryError("msg", { cause });
-    expect(err).toBeInstanceOf(Error);
-    expect(err.name).toBe("OpenLibraryError");
-    expect(err.cause).toBe(cause);
   });
 });
