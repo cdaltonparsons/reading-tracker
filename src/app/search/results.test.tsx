@@ -9,6 +9,7 @@ vi.mock("@/lib/open-library", async (importOriginal) => ({
 }));
 
 import { searchBooks, type Book } from "@/lib/open-library";
+import { BookResults } from "@/components/book-results";
 import { Results, ResultsSkeleton } from "./results";
 
 const mockSearch = vi.mocked(searchBooks);
@@ -39,35 +40,29 @@ describe("Results", () => {
     expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
   });
 
-  it("searches and renders heading plus cards for q=dune", async () => {
-    render(await Results({ searchParams: sp("dune") }));
-    expect(mockSearch).toHaveBeenCalledTimes(1);
-    expect(mockSearch).toHaveBeenCalledWith("dune");
-    const h2 = screen.getByRole("heading", { level: 2 });
-    expect(h2).toHaveTextContent("Results for “dune”");
-    expect(screen.getByText("Dune")).toBeInTheDocument();
-    expect(screen.getByText("Dune Messiah")).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
-    expect(screen.queryByText("Enter a title or author to search")).not.toBeInTheDocument();
+  it("keys the error boundary on the normalised query so a new search resets it", async () => {
+    const keyOf = async (q: string) =>
+      (await Results({ searchParams: sp(q) }) as React.ReactElement).key;
+    expect(await keyOf("a")).toBe("a");
+    expect(await keyOf(" a ")).toBe("a");
+    expect(await keyOf("b")).toBe("b");
   });
 
-  it("normalises the query before searching", async () => {
-    render(await Results({ searchParams: sp("  dune  ") }));
-    expect(mockSearch).toHaveBeenCalledWith("dune");
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Results for “dune”");
+  it("passes the normalised query to BookResults", async () => {
+    const boundary = (await Results({ searchParams: sp("  dune  ") })) as React.ReactElement<{
+      children: React.ReactElement<{ children: React.ReactElement<{ q: string }> }>;
+    }>;
+    const bookResults = boundary.props.children.props.children;
+    expect(bookResults.type).toBe(BookResults);
+    expect(bookResults.props.q).toBe("dune");
   });
 
-  it("shows the empty state when there are no results", async () => {
-    mockSearch.mockResolvedValue([]);
-    render(await Results({ searchParams: sp("zzzz") }));
-    expect(screen.getByText(/No books found for/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("zzzz");
-  });
-
-  it("does not swallow search errors", async () => {
-    mockSearch.mockRejectedValue(new Error("boom"));
-    await expect(Results({ searchParams: sp("dune") })).rejects.toThrow("boom");
-  });
+  // The end-to-end flow (error -> new search -> results) is checked by the
+  // browser verifier. This wiring is covered by the key test above plus the
+  // ResultsErrorBoundary tests (alert hides the raw message, clears when the
+  // key changes, stays when it is unchanged). Async BookResults itself is
+  // tested in components/book-results.test.tsx, since it can't resolve nested
+  // under jsdom.
 });
 
 describe("ResultsSkeleton", () => {

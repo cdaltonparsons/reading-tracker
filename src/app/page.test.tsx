@@ -9,4 +9,12 @@ describe("Home page", () => {
       screen.getByRole("heading", { name: "Reading Tracker" }),
     ).toBeInTheDocument();
   });
+
+  it("links to the search page", () => {
+    render(<Home />);
+    expect(screen.getByRole("link", { name: "Search books" })).toHaveAttribute(
+      "href",
+      "/search",
+    );
+  });
 });

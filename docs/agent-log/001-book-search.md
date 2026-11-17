@@ -2,7 +2,7 @@
 
 **Request:** Book search using the Open Library API (Roadmap #1).
 
-**Status:** Tasks 1 to 4 of 5 are done. Task 5 is not started.
+**Status:** Done. All 5 tasks passed review and browser verification. `docs/ROADMAP.md` marks Book search as "Done".
 
 **Git:** Task 1 was committed and pushed straight to `main` by mistake. From Task 2 on, each task gets its own feature branch and is merged through a PR.
 
@@ -279,5 +279,70 @@ During this task, Charlie noticed that reviewer "Nice to have" items were growin
 **Decided for Task 5:** Charlie chose to wrap only the results in a `catchError` boundary from `next/error`, instead of using a segment-level `error.tsx`. That way the heading and search box stay visible when Open Library fails. Things to remember when building it:
 
 - **Put the boundary in `page.tsx`, around `<Results>`, not in the layout.** `catchError` only resets on navigation to a different route. The page remounts on every query change and the layout doesn't, so a boundary in the layout could keep showing an old error after a new search. (From the reviewer, round 3.)
+  - **Correction, from Task 5:** the claim that the page remounts on every query change was wrong. The orchestrator copied it into these notes without checking. See Task 5 below.
 - **Don't build UI that relies on the timeout message.** In production, the error only reaches the page as "Open Library search failed". (Task 1 note.)
 - **Test it with the verifier.** An upstream failure currently shows Next's generic "This page couldn't load" screen, plus React error #441 in the console.
+
+## Task 5: Error state and home-page link
+
+**Branch:** `feature/search-cont`, based on `main` after Charlie merged the Task 3 and Task 4 stack (#2, then #3) with GitHub's new pull request stacks feature.
+
+**Agents:**
+
+1. implementer → test-writer → reviewer (changes requested)
+2. implementer → test-writer (6 tests skipped) → implementer (an export, which Charlie declined at the permission prompt) → implementer (moved `BookResults` into its own file, at Charlie's choice) → test-writer → reviewer (approved)
+3. verifier (PASS)
+
+**Review rounds:** 2. **Verifier rounds:** 1.
+
+**Result:**
+
+- **Error boundary.** `src/components/results-error-boundary.tsx` is the only `"use client"` file. It is `catchError(ResultsError)` from `next/error`.
+  - The fallback ignores the error and shows a `role="alert"` reading "Couldn't reach Open Library. Please try again."
+  - It has a "Try again" button that calls `retry()`. Per the docs, `retry()` re-fetches the server data, while `reset()` only clears the state.
+- **Results.** In `src/app/search/results.tsx`, `Results` normalises `q` and renders `<ResultsErrorBoundary key={q}><Suspense><BookResults q={q} /></Suspense></ResultsErrorBoundary>`. `page.tsx` keeps an outer `Suspense`, so the skeleton stays in the static shell.
+- **`BookResults`.** It lives in `src/components/book-results.tsx` and does the fetch and the rendering.
+- **Home page link.** The home page links to `/search` ("Search books").
+- **Tests:** 98 pass, with 0 skipped.
+
+**Most interesting catch (reviewer, round 1):** a new search after an error left the error on screen. The fix was based on a wrong idea from Task 4, which the orchestrator had copied into the Task 5 notes: that the page segment remounts on every query change. The reviewer read the Next 16.4.5 source and found two things:
+
+- `catchError` only resets when the pathname changes (`catch-error.js`), and `/search?q=a` → `/search?q=b` keeps the pathname `/search`.
+- Page segments keep their state across navigations that only change search params (`layout-router.js:361-365`: "search params do not cause state to be lost").
+
+So the boundary survived and kept its error. The fix was a `key` on the boundary, set to the normalised query. The same wrong comment is still in `layout.tsx`, and is in the backlog. The Task 4 search box design wasn't affected, because it relies on the layout persisting, and that part is true.
+
+**What went wrong:**
+
+- **Skipped tests.** Moving the error boundary inside `Results` put an async Server Component (`BookResults`) inside the tree, and jsdom with React 19 can't render that. The test-writer correctly skipped 6 tests instead of forcing them, but that would have meant coverage had dropped.
+  - The orchestrator's first fix exported `BookResults` from `results.tsx`. Charlie declined the implementer's lint run at the permission prompt.
+  - The implementer pointed out that exporting widened the module's public surface just for tests.
+  - Charlie chose to move `BookResults` into its own file instead. The tests call it directly, and the boundary-key behaviour is covered by synchronous boundary tests plus a key test on `Results`.
+- **An unchecked claim in the notes.** The orchestrator copied a reviewer's claim into the plan notes without verifying it, and the wrong comment went into the code. Treat source-level claims about framework behaviour as unverified until someone checks the source or the docs.
+
+**Verifier highlights:** to force Open Library failures, the verifier used a `NODE_OPTIONS=--require` preload outside the repo, with a flag file to switch them on and off, so no test-only code went into the app. Its results:
+
+- The friendly alert replaced Next's crash screen.
+- "Try again" did a real refetch.
+- A new search cleared the alert. In 63 samples, the alert never lingered after the new results rendered.
+- A direct load into an error showed the heading, the box and the alert, not a whole-page error.
+- All the Task 4 regressions passed.
+- React #441 now only appears in the console, never on the page.
+
+**Backlog additions:**
+
+- searching the same query again doesn't clear the error
+- a brittle prop test
+- focus after "Try again"
+- no results with JavaScript off
+- checking the "No cover" placeholder is visible
+
+## Wrap-up
+
+- **Book search is done:** 5 tasks, 98 tests, and every task with something to see was verified in a real browser.
+- **New agent:** the feature also produced the `verifier`.
+- **New process:** reviewer findings now split into "Must fix" and "Backlog".
+- **Clean-ups:** a 106 → 72 test audit, and a roadmap step in `/build-feature`.
+- **Bugs only the verifier caught:** the mobile overflow, missing loading feedback, and a wiped correction with lost focus. Unit tests couldn't see any of them.
+- **A bug the reviewer caught in the source:** the stuck error alert, found by reading the Next source.
+- **What's left:** the open follow-ups are in `docs/BACKLOG.md`.
