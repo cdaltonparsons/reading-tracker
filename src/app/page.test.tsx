@@ -17,4 +17,21 @@ describe("Home page", () => {
       "/search",
     );
   });
+
+  it("links to the shelves page", () => {
+    render(<Home />);
+    expect(screen.getByRole("link", { name: "My shelves" })).toHaveAttribute(
+      "href",
+      "/shelves",
+    );
+  });
+
+  it("shows Search books before My shelves", () => {
+    render(<Home />);
+    const names = screen.getAllByRole("link").map((l) => l.textContent);
+    expect(names.indexOf("Search books")).toBeGreaterThanOrEqual(0);
+    expect(names.indexOf("My shelves")).toBeGreaterThan(
+      names.indexOf("Search books"),
+    );
+  });
 });
