@@ -1,7 +1,17 @@
 import Image from "next/image";
+import { ShelfControl } from "@/components/shelf-control";
 import { coverUrl, type Book } from "@/lib/open-library";
+import type { Shelf } from "@/lib/shelf";
 
-export function BookCard({ book }: { book: Book }) {
+// `shelf`: a Shelf or null (unshelved) renders the control; `undefined` means
+// shelves are unavailable, so no control is rendered.
+export function BookCard({
+  book,
+  shelf,
+}: {
+  book: Book;
+  shelf: Shelf | null | undefined;
+}) {
   const authors =
     book.authors.length > 0 ? book.authors.join(", ") : "Unknown author";
   const year = book.year === null ? "Year unknown" : String(book.year);
@@ -29,6 +39,11 @@ export function BookCard({ book }: { book: Book }) {
         <h3 className="font-semibold wrap-anywhere">{book.title}</h3>
         <p className="text-sm text-zinc-600 wrap-anywhere">{authors}</p>
         <p className="text-sm text-zinc-500">{year}</p>
+        {shelf !== undefined && (
+          <div className="mt-3">
+            <ShelfControl book={book} shelf={shelf} />
+          </div>
+        )}
       </div>
     </article>
   );

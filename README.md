@@ -53,6 +53,16 @@ npm run dev     # http://localhost:3000
 npm run check   # lint, typecheck and tests
 ```
 
+## Database
+
+Shelves are stored with Drizzle ORM and libSQL. In development that is a local SQLite file, `local.db`, which is gitignored. Create it (or apply new migrations) with:
+
+```bash
+npm run db:migrate
+```
+
+No setup is needed on a fresh checkout. To use a different database, copy `.env.example` to `.env.local` and set `TURSO_DATABASE_URL` (defaults to `file:local.db`) and, for a remote Turso database, `TURSO_AUTH_TOKEN`. After changing `src/lib/db/schema.ts`, run `npm run db:generate` and commit the new files in `drizzle/`.
+
 To build a feature with the agent team, open the project in Claude Code and run:
 
 ```

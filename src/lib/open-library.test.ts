@@ -12,6 +12,11 @@ vi.mock("next/navigation", () => ({
 
 import { cacheLife } from "next/cache";
 import {
+  MAX_AUTHOR_LENGTH,
+  MAX_AUTHORS,
+  MAX_TITLE_LENGTH,
+} from "./book-limits";
+import {
   OpenLibraryError,
   coverUrl,
   parseSearchResponse,
@@ -128,6 +133,58 @@ describe("parseSearchResponse", () => {
       ],
     });
     expect(book.authors).toEqual(["Frank Herbert"]);
+  });
+
+  describe("size limits", () => {
+    const parseOne = (fields: Record<string, unknown>) =>
+      parseSearchResponse({
+        docs: [{ key: "/works/OL1W", title: "T", ...fields }],
+      })[0];
+
+    it("keeps only the first MAX_AUTHORS authors, in order", () => {
+      const names = Array.from(
+        { length: MAX_AUTHORS + 20 },
+        (_, i) => `Author ${i}`,
+      );
+      const book = parseOne({ author_name: names });
+      expect(book.authors).toEqual(names.slice(0, MAX_AUTHORS));
+    });
+
+    it("cuts a long title and a long author name to the limits", () => {
+      const book = parseOne({
+        title: "t".repeat(MAX_TITLE_LENGTH + 500),
+        author_name: ["a".repeat(MAX_AUTHOR_LENGTH + 200)],
+      });
+      expect(book.title).toBe("t".repeat(MAX_TITLE_LENGTH));
+      expect(book.authors).toEqual(["a".repeat(MAX_AUTHOR_LENGTH)]);
+    });
+
+    it("trims again after cutting the title", () => {
+      const title = "t".repeat(MAX_TITLE_LENGTH - 1) + " " + "more";
+      const book = parseOne({ title });
+      expect(book.title).toBe("t".repeat(MAX_TITLE_LENGTH - 1));
+      expect(book.title.length).toBeLessThanOrEqual(MAX_TITLE_LENGTH);
+    });
+
+    it("trims again after cutting an author", () => {
+      const name = "a".repeat(MAX_AUTHOR_LENGTH - 1) + " " + "more";
+      const book = parseOne({ author_name: [name] });
+      expect(book.authors).toEqual(["a".repeat(MAX_AUTHOR_LENGTH - 1)]);
+    });
+
+    it("does not drop a doc for being long", () => {
+      const books = parseSearchResponse({
+        docs: [
+          { key: "/works/OL1W", title: "Short" },
+          {
+            key: "/works/OL2W",
+            title: "t".repeat(MAX_TITLE_LENGTH * 2),
+            author_name: Array.from({ length: MAX_AUTHORS * 2 }, () => "a"),
+          },
+        ],
+      });
+      expect(books.map((b) => b.id)).toEqual(["/works/OL1W", "/works/OL2W"]);
+    });
   });
 
   it.each([
