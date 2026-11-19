@@ -5,7 +5,12 @@ import { books } from "./db/schema";
 import { createTestDb } from "./db/test-db";
 import type { Book } from "./open-library";
 import { bookSchema } from "./book";
-import { getShelvedBooks, getShelvesFor, setShelf } from "./shelves";
+import {
+  getShelvedBooks,
+  getShelvesFor,
+  removeFromShelf,
+  setShelf,
+} from "./shelves";
 
 const dune: Book = {
   id: "/works/OL45804W",
@@ -97,6 +102,56 @@ describe("setShelf", () => {
   it("rejects when the database fails", async () => {
     ctx.close();
     await expect(setShelf(dune, "reading", ctx.db)).rejects.toThrow();
+  });
+});
+
+describe("removeFromShelf", () => {
+  it("deletes the row for that work id", async () => {
+    await setShelf(dune, "reading", ctx.db);
+    await removeFromShelf(dune.id, ctx.db);
+    expect(await ctx.db.select().from(books)).toEqual([]);
+    expect(await getShelvesFor([dune.id], ctx.db)).toEqual({});
+  });
+
+  it("does nothing and does not throw for an id that is not shelved", async () => {
+    await setShelf(dune, "reading", ctx.db);
+    await expect(
+      removeFromShelf("/works/OL999W", ctx.db),
+    ).resolves.toBeUndefined();
+    expect(await ctx.db.select().from(books)).toHaveLength(1);
+  });
+
+  it("does not throw on an empty database", async () => {
+    await expect(removeFromShelf(dune.id, ctx.db)).resolves.toBeUndefined();
+  });
+
+  it("leaves books on other shelves alone", async () => {
+    await setShelf(dune, "reading", ctx.db);
+    await setShelf(emma, "finished", ctx.db);
+    await removeFromShelf(dune.id, ctx.db);
+    expect(await getShelvesFor([dune.id, emma.id], ctx.db)).toEqual({
+      [emma.id]: "finished",
+    });
+  });
+
+  it("can be removed twice in a row", async () => {
+    await setShelf(dune, "reading", ctx.db);
+    await removeFromShelf(dune.id, ctx.db);
+    await expect(removeFromShelf(dune.id, ctx.db)).resolves.toBeUndefined();
+  });
+
+  it("allows the book to be shelved again after removal", async () => {
+    await setShelf(dune, "reading", ctx.db);
+    await removeFromShelf(dune.id, ctx.db);
+    await setShelf(dune, "finished", ctx.db);
+    expect(await getShelvesFor([dune.id], ctx.db)).toEqual({
+      [dune.id]: "finished",
+    });
+  });
+
+  it("rejects when the database fails", async () => {
+    ctx.close();
+    await expect(removeFromShelf(dune.id, ctx.db)).rejects.toThrow();
   });
 });
 

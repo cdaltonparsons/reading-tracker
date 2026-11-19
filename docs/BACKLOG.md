@@ -51,6 +51,9 @@ Bigger features belong in `docs/ROADMAP.md`.
 | Drop the duplicate "rejects when the database fails" test | `src/lib/shelves.test.ts:244-247` | The `rejects.toBe(boom)` test below it checks the same thing more strictly. | Shelves page, Task 1 review |
 | Split `shelves.test.ts` by function | `src/lib/shelves.test.ts` | It's about 255 lines, well past the 150-line guideline, and will grow as more shelf functions are added. | Shelves page, Task 1 review |
 | Focus is lost after a move or removal on `/shelves` | `src/components/shelf-section.tsx`, `src/components/shelf-control.tsx` | A moved book renders in a different list, so React remounts its control. Focus falls to `<body>` and the "Saved to …" status is lost. Fix with a page-level live region and by moving focus to the destination section heading. | Shelves page, planner risk 1 |
+| Trim the duplicate integration tests | `src/app/actions/shelves.integration.test.ts:50-65` | "does not remove other books" and "succeeds for an id that is not shelved" repeat the lib tests. Keep only the `getShelvesFor` check. | Shelves page, Task 3 review |
+| Drop "can be removed twice in a row" | `src/lib/shelves.test.ts` (removeFromShelf block) | Same case as the "not shelved" test above it. | Shelves page, Task 3 review |
+| Split `src/app/actions/shelves.test.ts` by action | `src/app/actions/shelves.test.ts` | About 206 lines, past the 150-line guideline, and will grow with each new shelf action. | Shelves page, Task 3 review |
 | Searches before the JavaScript loads do a full page load | `src/components/search-form.tsx` | If you press Enter within about a second of a slow page load, the browser does a plain GET request. There's no pending state and the box is briefly blank. This is the plain HTML form working without JavaScript, which is fine. Worth knowing if it ever looks odd. | Book search, Task 4 verifier |
 
 ## Done

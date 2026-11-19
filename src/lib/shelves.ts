@@ -1,4 +1,4 @@
-import { desc, asc, inArray } from "drizzle-orm";
+import { desc, asc, eq, inArray } from "drizzle-orm";
 import { getDb, type Db } from "./db/client";
 import { books } from "./db/schema";
 import type { Book } from "./open-library";
@@ -26,6 +26,15 @@ export async function setShelf(
     .insert(books)
     .values({ workId: book.id, ...snapshot, addedAt: now })
     .onConflictDoUpdate({ target: books.workId, set: snapshot });
+}
+
+// Takes a book off its shelf. Removing an id that is not shelved does nothing.
+// Database errors are thrown, not swallowed.
+export async function removeFromShelf(
+  workId: string,
+  db: Db = getDb(),
+): Promise<void> {
+  await db.delete(books).where(eq(books.workId, workId));
 }
 
 // Maps work id to shelf for the ids that are shelved. Unshelved ids are absent.
