@@ -59,6 +59,8 @@ Bigger features belong in `docs/ROADMAP.md`.
 | Test two failed removes in a row | `src/components/remove-from-shelf-button.test.tsx:110-128` | The component handles it correctly, but no test covers it. `ShelfControl` regressed on this case. | Shelves page, Task 4 review |
 | Move `vi.unstubAllGlobals()` into an `afterEach` | `src/components/remove-from-shelf-button.test.tsx:161` | If the test fails early, the fake `confirm`, `alert` and `prompt` stay in place for later tests. | Shelves page, Task 4 review |
 | Trim `remove-from-shelf-button.test.tsx` | `src/components/remove-from-shelf-button.test.tsx` | 173 lines, past the 150-line guideline. Line 37 repeats line 36, and tests at lines 33-40 and 164-172 overlap with `shelf-section.test.tsx`. | Shelves page, Task 4 review |
+| Remove the extra `aria-live` on the shelves loading state | `src/app/shelves/loading.tsx:3` | `role="status"` already implies `aria-live="polite"`. Same as the search skeleton item. | Shelves page, Task 2 review |
+| Give `/shelves` its own page title | `src/app/shelves/layout.tsx` | Every route shares the title "Reading Tracker", so tabs and history can't tell pages apart. Add `metadata` to the shelves layout, or use a title template in the root layout. `/search` has the same problem. | Shelves page, Task 2 review |
 | Searches before the JavaScript loads do a full page load | `src/components/search-form.tsx` | If you press Enter within about a second of a slow page load, the browser does a plain GET request. There's no pending state and the box is briefly blank. This is the plain HTML form working without JavaScript, which is fine. Worth knowing if it ever looks odd. | Book search, Task 4 verifier |
 
 ## Done
