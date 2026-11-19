@@ -53,6 +53,9 @@ describe("setShelf", () => {
         shelf: "reading",
         addedAt: 1000,
         updatedAt: 1000,
+        currentPage: null,
+        startedAt: null,
+        finishedAt: null,
       },
     ]);
   });
@@ -77,6 +80,9 @@ describe("setShelf", () => {
         shelf: "finished",
         addedAt: 1000,
         updatedAt: 2000,
+        currentPage: null,
+        startedAt: null,
+        finishedAt: null,
       },
     ]);
   });
