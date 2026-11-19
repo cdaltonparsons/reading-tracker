@@ -15,6 +15,12 @@ export default function Home() {
       >
         Search books
       </Link>
+      <Link
+        href="/shelves"
+        className="w-fit font-medium underline underline-offset-4"
+      >
+        My shelves
+      </Link>
     </main>
   );
 }
