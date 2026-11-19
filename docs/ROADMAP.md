@@ -5,7 +5,7 @@ Each feature is built with `/build-feature` and logged in `docs/agent-log/`.
 | # | Feature | Status |
 |---|---------|--------|
 | 1 | **Book search.** Search Open Library by title or author and show results with cover, title, author and year. | Done |
-| 2 | **Data layer and shelves.** Set up Drizzle with libSQL. Add a book from search to a shelf: Want to read, Reading, or Finished. | Not started |
+| 2 | **Data layer and shelves.** Set up Drizzle with libSQL. Add a book from search to a shelf: Want to read, Reading, or Finished. | Done |
 | 3 | **My shelves page.** See books grouped by shelf and move them between shelves. | Not started |
 | 4 | **Reading progress.** Log the current page for books on the Reading shelf. Record start and finish dates. | Not started |
 | 5 | **Yearly goal.** Set a goal for books this year and see progress toward it. | Not started |

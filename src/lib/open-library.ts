@@ -1,6 +1,7 @@
 import { cacheLife } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
+import { MAX_AUTHOR_LENGTH, MAX_AUTHORS, MAX_TITLE_LENGTH } from "./book-limits";
 import { normalizeQuery } from "./query";
 
 // Re-exported so existing imports keep working.
@@ -24,6 +25,12 @@ export class OpenLibraryError extends Error {
 // separately so one malformed doc can be dropped without failing the rest.
 const searchResponseSchema = z.object({ docs: z.array(z.unknown()) });
 
+// Cut to the limit, then trim again so no trailing space is left. The input is
+// already trimmed and non-empty, so the result is never empty.
+function truncate(value: string, max: number): string {
+  return value.slice(0, max).trim();
+}
+
 // Optional fields fall back to a default via `.catch` instead of failing.
 // Missing `title` or `key` makes the doc invalid, so it gets dropped.
 const docSchema = z
@@ -46,8 +53,10 @@ const docSchema = z
   })
   .transform((doc) => ({
     id: doc.key,
-    title: doc.title,
-    authors: doc.author_name,
+    title: truncate(doc.title, MAX_TITLE_LENGTH),
+    authors: doc.author_name
+      .slice(0, MAX_AUTHORS)
+      .map((name) => truncate(name, MAX_AUTHOR_LENGTH)),
     year: doc.first_publish_year,
     coverId: doc.cover_i,
   }));

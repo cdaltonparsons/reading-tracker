@@ -13,6 +13,7 @@ Features are built with the `/build-feature` command, which runs the subagents i
 - `test-writer` writes tests and never touches app code
 - `reviewer` reviews the diff and returns APPROVE or CHANGES REQUESTED
 - `verifier` runs the app in a headless browser (Playwright), checks the real user flows for UI tasks, and returns PASS or FAIL
+- `debugger` reproduces a bug, finds its root cause and makes the smallest fix. Use it when the verifier fails and the cause isn't obvious. It's a personal agent defined in `~/.claude/agents/debugger.md`, not in this repo.
 
 The human (Charlie) reviews every change in their IDE and makes every commit. **No agent ever runs `git commit`, `git push`, or opens a pull request.**
 
@@ -20,6 +21,7 @@ Each feature run is written up in `docs/agent-log/`. The planned features are in
 
 ## Stack
 
+- Node 22 (see `.nvmrc`). Vitest 5 and jsdom 31 don't run on Node 20.
 - Next.js (App Router) with TypeScript in strict mode, source in `src/`
 - Tailwind CSS for styling
 - Vitest and React Testing Library for tests
@@ -32,6 +34,8 @@ Each feature run is written up in `docs/agent-log/`. The planned features are in
 - `npm run check` runs lint, typecheck and tests. It must pass before a task is done.
 - `npm test` runs tests only
 - `npm run build` makes a production build
+- `npm run db:migrate` applies the committed migrations in `drizzle/`. It creates `local.db` in development, or uses `TURSO_DATABASE_URL` if that's set.
+- `npm run db:generate` creates a new migration after you change `src/lib/db/schema.ts`. Commit the generated files.
 
 ## Conventions
 

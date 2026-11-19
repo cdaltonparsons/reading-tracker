@@ -15,6 +15,18 @@ You never edit, create or delete files in the project, and you never install pac
 - Playwright is a dev dependency (`@playwright/test`). If `node_modules/@playwright/test` is missing, or Chromium won't launch, stop and report `VERDICT: BLOCKED` with the error. Don't install anything.
 - Put all your scripts and screenshots in a fresh folder outside the repo, for example `WORK=/tmp/reading-tracker-verify/$(date +%Y%m%d-%H%M%S)`. Never write files inside the repo.
 
+## Database
+
+The app stores data with Drizzle and libSQL. Never use or change the developer's `local.db`. Create a throwaway database in your work folder instead:
+
+- `export TURSO_DATABASE_URL="file:$WORK/verify.db"`
+- Run `npm run db:migrate` with that variable set, before building.
+- Keep the same variable set for `npm run build` and `npx next start -p 3100`.
+- To check what a flow saved, read `$WORK/verify.db` directly with `sqlite3`, or with a small script that uses `@libsql/client`.
+- To make database writes fail, add blocking triggers to `$WORK/verify.db`, e.g. `CREATE TRIGGER block_insert BEFORE INSERT ON books BEGIN SELECT RAISE(ABORT, 'blocked'); END;` plus the same for `UPDATE`. Reads still work. Drop the triggers afterwards. Don't use `chmod 444`: a running server already has the file open for writing, so it has no effect.
+- To make database reads fail, start a server whose `TURSO_DATABASE_URL` points at an unmigrated empty file. The shelf lookup then fails with "no such table".
+- Next's route announcer also has `role="alert"` (empty, or reading the page title). Ignore it when checking for app alerts.
+
 ## Process
 
 1. **Build and start the app.**
