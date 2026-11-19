@@ -1,4 +1,5 @@
 import { BookCard } from "@/components/book-card";
+import { RemoveFromShelfButton } from "@/components/remove-from-shelf-button";
 import type { Book } from "@/lib/open-library";
 import { SHELF_LABELS, type Shelf } from "@/lib/shelf";
 
@@ -22,7 +23,9 @@ export function ShelfSection({
         <ul className="flex flex-col gap-4">
           {books.map((book) => (
             <li key={book.id}>
-              <BookCard book={book} shelf={shelf} />
+              <BookCard book={book} shelf={shelf}>
+                <RemoveFromShelfButton workId={book.id} title={book.title} />
+              </BookCard>
             </li>
           ))}
         </ul>

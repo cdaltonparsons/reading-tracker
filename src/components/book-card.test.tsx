@@ -89,4 +89,31 @@ describe("BookCard", () => {
     render(<BookCard book={makeBook()} shelf={undefined} />);
     expect(screen.queryByRole("group")).toBeNull();
   });
+
+  it("renders no Remove button when no children are given", () => {
+    render(<BookCard book={makeBook()} shelf="reading" />);
+    expect(screen.queryByRole("button", { name: /Remove/ })).toBeNull();
+  });
+
+  it("renders children inside the card, after the shelf control", () => {
+    render(
+      <BookCard book={makeBook()} shelf="reading">
+        <button type="button">Extra</button>
+      </BookCard>,
+    );
+    const article = screen.getByRole("article");
+    const extra = within(article).getByRole("button", { name: "Extra" });
+    const group = within(article).getByRole("group", { name: "Shelf for Dune" });
+    expect(group.compareDocumentPosition(extra) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("renders children even when the shelf control is hidden", () => {
+    render(
+      <BookCard book={makeBook()} shelf={undefined}>
+        <p>Child</p>
+      </BookCard>,
+    );
+    expect(screen.getByText("Child")).toBeInTheDocument();
+    expect(screen.queryByRole("group")).toBeNull();
+  });
 });

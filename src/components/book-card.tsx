@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { ShelfControl } from "@/components/shelf-control";
 import { coverUrl, type Book } from "@/lib/open-library";
 import type { Shelf } from "@/lib/shelf";
@@ -8,9 +9,11 @@ import type { Shelf } from "@/lib/shelf";
 export function BookCard({
   book,
   shelf,
+  children,
 }: {
   book: Book;
   shelf: Shelf | null | undefined;
+  children?: ReactNode;
 }) {
   const authors =
     book.authors.length > 0 ? book.authors.join(", ") : "Unknown author";
@@ -44,6 +47,7 @@ export function BookCard({
             <ShelfControl book={book} shelf={shelf} />
           </div>
         )}
+        {children && <div className="mt-3">{children}</div>}
       </div>
     </article>
   );

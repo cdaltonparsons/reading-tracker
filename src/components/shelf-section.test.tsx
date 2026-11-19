@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 vi.mock("next/cache", () => ({ cacheLife: vi.fn() }));
 vi.mock("next/navigation", () => ({ unstable_rethrow: vi.fn() }));
-vi.mock("@/app/actions/shelves", () => ({ setShelfAction: vi.fn() }));
+vi.mock("@/app/actions/shelves", () => ({
+  setShelfAction: vi.fn(),
+  removeFromShelfAction: vi.fn(),
+}));
 
+import { removeFromShelfAction } from "@/app/actions/shelves";
 import type { Book } from "@/lib/open-library";
 import { SHELVES } from "@/lib/shelf";
 import { ShelfSection } from "./shelf-section";
@@ -61,5 +66,43 @@ describe("ShelfSection", () => {
         { want_to_read: "Want to read", reading: "Reading", finished: "Finished" }[shelf],
       );
     }
+  });
+
+  it("renders a Remove button on every card with an accessible name naming the title", () => {
+    render(<ShelfSection shelf="reading" books={[makeBook(1), makeBook(2), makeBook(3)]} />);
+    for (const article of screen.getAllByRole("article")) {
+      const title = within(article).getByRole("heading", { level: 3 }).textContent;
+      const remove = within(article).getByRole("button", {
+        name: `Remove ${title} from your shelves`,
+      });
+      expect(remove.textContent).toBe("Remove");
+    }
+    expect(screen.getAllByRole("button", { name: /^Remove .* from your shelves$/ })).toHaveLength(3);
+  });
+
+  it("only the clicked card's Remove button calls the action, with that book's id", async () => {
+    vi.mocked(removeFromShelfAction).mockReset();
+    vi.mocked(removeFromShelfAction).mockResolvedValue({ ok: false });
+    const user = userEvent.setup();
+    render(<ShelfSection shelf="reading" books={[makeBook(1), makeBook(2), makeBook(3)]} />);
+
+    await user.click(screen.getByRole("button", { name: "Remove Book 2 from your shelves" }));
+
+    expect(removeFromShelfAction).toHaveBeenCalledTimes(1);
+    expect(removeFromShelfAction).toHaveBeenCalledWith({ workId: "/works/OL2W" });
+    // Failure leaves every card in place and shows the alert only in the clicked card.
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't remove. Please try again.");
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    const articles = screen.getAllByRole("article");
+    expect(within(articles[1]).getByRole("alert")).toBeInTheDocument();
+    expect(within(articles[0]).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(articles[2]).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(articles[0]).getByRole("button", { name: /^Remove/ })).toBeEnabled();
+  });
+
+  it("renders no Remove buttons when the shelf is empty", () => {
+    render(<ShelfSection shelf="reading" books={[]} />);
+    expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
   });
 });
