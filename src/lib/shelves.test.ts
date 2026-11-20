@@ -53,6 +53,9 @@ describe("setShelf", () => {
         shelf: "reading",
         addedAt: 1000,
         updatedAt: 1000,
+        currentPage: null,
+        startedAt: 1000,
+        finishedAt: null,
       },
     ]);
   });
@@ -77,6 +80,9 @@ describe("setShelf", () => {
         shelf: "finished",
         addedAt: 1000,
         updatedAt: 2000,
+        currentPage: null,
+        startedAt: 1000,
+        finishedAt: 2000,
       },
     ]);
   });
@@ -217,23 +223,51 @@ describe("getShelvedBooks", () => {
   it("returns books with id, title, authors, year and coverId that pass bookSchema", async () => {
     await setShelf(dune, "reading", ctx.db);
     const result = await getShelvedBooks(ctx.db);
-    expect(result.reading).toEqual([dune]);
-    expect(bookSchema.parse(result.reading[0])).toEqual(dune);
+    expect(result.reading).toEqual([
+      { ...dune, currentPage: null, startedAt: expect.any(Number), finishedAt: null },
+    ]);
+    const { currentPage, startedAt, finishedAt, ...bookFields } =
+      result.reading[0];
+    void currentPage;
+    void startedAt;
+    void finishedAt;
+    expect(bookSchema.parse(bookFields)).toEqual(dune);
   });
 
   it("round-trips null year and coverId and empty authors", async () => {
     const sparse = { ...dune, year: null, coverId: null, authors: [] };
     await setShelf(sparse, "finished", ctx.db);
     const result = await getShelvedBooks(ctx.db);
-    expect(result.finished).toEqual([sparse]);
-    expect(bookSchema.parse(result.finished[0])).toEqual(sparse);
+    expect(result.finished).toEqual([
+      {
+        ...sparse,
+        currentPage: null,
+        startedAt: null,
+        finishedAt: expect.any(Number),
+      },
+    ]);
+    const { currentPage, startedAt, finishedAt, ...bookFields } =
+      result.finished[0];
+    void currentPage;
+    void startedAt;
+    void finishedAt;
+    expect(bookSchema.parse(bookFields)).toEqual(sparse);
   });
 
   it("does not include extra row fields on returned books", async () => {
     await setShelf(dune, "reading", ctx.db);
     const [book] = (await getShelvedBooks(ctx.db)).reading;
     expect(Object.keys(book).sort()).toEqual(
-      ["authors", "coverId", "id", "title", "year"],
+      [
+        "authors",
+        "coverId",
+        "currentPage",
+        "finishedAt",
+        "id",
+        "startedAt",
+        "title",
+        "year",
+      ],
     );
   });
 

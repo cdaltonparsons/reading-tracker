@@ -17,6 +17,10 @@ export const books = sqliteTable(
     // Milliseconds since epoch, set by the data layer.
     addedAt: integer("added_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
+    // Reading progress. All nullable; times are milliseconds since epoch.
+    currentPage: integer("current_page"),
+    startedAt: integer("started_at"),
+    finishedAt: integer("finished_at"),
   },
   (table) => [
     check(

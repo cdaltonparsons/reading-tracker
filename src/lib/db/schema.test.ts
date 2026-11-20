@@ -28,7 +28,12 @@ describe("books schema", () => {
   it("round-trips a row, with authors as an array", async () => {
     await db.insert(books).values(row());
     const [got] = await db.select().from(books);
-    expect(got).toEqual(row());
+    expect(got).toEqual({
+      ...row(),
+      currentPage: null,
+      startedAt: null,
+      finishedAt: null,
+    });
     expect(got.authors).toEqual(["A", "B"]);
   });
 
@@ -37,6 +42,24 @@ describe("books schema", () => {
     const [got] = await db.select().from(books);
     expect(got.year).toBeNull();
     expect(got.coverId).toBeNull();
+  });
+
+  it("round-trips the progress fields as numbers", async () => {
+    await db
+      .insert(books)
+      .values(row({ currentPage: 120, startedAt: 1000, finishedAt: 2000 }));
+    const [got] = await db.select().from(books);
+    expect(got.currentPage).toBe(120);
+    expect(got.startedAt).toBe(1000);
+    expect(got.finishedAt).toBe(2000);
+  });
+
+  it("defaults the progress fields to null when left out", async () => {
+    await db.insert(books).values(row());
+    const [got] = await db.select().from(books);
+    expect(got.currentPage).toBeNull();
+    expect(got.startedAt).toBeNull();
+    expect(got.finishedAt).toBeNull();
   });
 
   it("rejects a duplicate workId", async () => {

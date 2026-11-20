@@ -61,10 +61,22 @@ Bigger features belong in `docs/ROADMAP.md`.
 | Trim `remove-from-shelf-button.test.tsx` | `src/components/remove-from-shelf-button.test.tsx` | 173 lines, past the 150-line guideline. Line 37 repeats line 36, and tests at lines 33-40 and 164-172 overlap with `shelf-section.test.tsx`. | Shelves page, Task 4 review |
 | Remove the extra `aria-live` on the shelves loading state | `src/app/shelves/loading.tsx:3` | `role="status"` already implies `aria-live="polite"`. Same as the search skeleton item. | Shelves page, Task 2 review |
 | Give `/shelves` its own page title | `src/app/shelves/layout.tsx` | Every route shares the title "Reading Tracker", so tabs and history can't tell pages apart. Add `metadata` to the shelves layout, or use a title template in the root layout. `/search` has the same problem. | Shelves page, Task 2 review |
+| Merge the "defaults progress fields to null" test into the round-trip test | `src/lib/db/schema.test.ts:57-63` | The extended round-trip test already checks the three nulls with an exact `toEqual`. | Reading progress, Task 1 review |
+| Pages read needs a page count | `src/lib/open-library.ts`, `src/lib/book.ts` | Feature #4 stores a current page with no total, so there's no percentage. For #6, either take `number_of_pages_median` from Open Library or let the user enter a total. | Reading progress, planner |
+| Removing a Finished book drops it from the stats | `src/app/actions/shelves.ts` | Removal is a hard delete, so its progress and finish date go too. Decide before #6 whether stats should count removed books. | Reading progress, planner |
+| Edit start and finish dates by hand | `src/lib/shelves.ts` | Finished → Reading → Finished resets the finish date to today. Add an edit option later. | Reading progress, planner |
+| Type the `'finished'` literal in the finish-date CASE | `src/lib/shelves.ts:48` | It's a raw string the type checker can't link to `SHELVES`. Renaming the shelf would silently break the finish-date logic. | Reading progress, Task 2 review |
+| Leave unchanged date columns out of the upsert set | `src/lib/shelves.ts:45`, `:49` | `col = col` does nothing. Dropping those keys would make the statement shorter. | Reading progress, Task 2 review |
+| Trim `shelves.dates.test.ts` | `src/lib/shelves.dates.test.ts` | About 180 lines, past the 150-line guideline. The "addedAt never changes" loop at `:151` overlaps with the "updates in place" test in `shelves.test.ts`. | Reading progress, Task 2 review |
+| Simplify the field split in the bookSchema tests | `src/lib/shelves.test.ts:229-234`, `:252-257` | Removing the progress keys and calling `void` on each is noise, because `bookSchema` already drops unknown keys. Parse `result.reading[0]` directly, or add a small helper. | Reading progress, Task 4 review |
+| Rename the ShelvedBook action test | `src/app/actions/shelves.progress.integration.test.ts:45` | "accepts a ShelvedBook and strips the progress keys" claims more than it proves, because `setShelf` reads only the Book fields. Rename it to something like "accepts a ShelvedBook and keeps stored progress". | Reading progress, Task 4 review |
+| Warn against `.returning()` in `setCurrentPage` | `src/lib/shelves.ts:72-76` | The local libSQL driver reports `rowsAffected = 0` for statements that return rows, so every save would look like "not on Reading". Add a comment. | Reading progress, Task 3 review |
 | Searches before the JavaScript loads do a full page load | `src/components/search-form.tsx` | If you press Enter within about a second of a slow page load, the browser does a plain GET request. There's no pending state and the box is briefly blank. This is the plain HTML form working without JavaScript, which is fine. Worth knowing if it ever looks odd. | Book search, Task 4 verifier |
 
 ## Done
 
 Move finished items here with the PR or date they were done in.
+
+- **Make the Want-to-read integration test check the row directly.** Fixed in Reading progress, Task 4 (the assertion now reads `currentPage` through `getShelvedBooks`).
 
 - **Keep focus in the search box after a search.** Fixed in Book search Task 4, round 3 (2026-11-17). The form moved into `src/app/search/layout.tsx` and the box became a controlled `SearchBox`. The verifier confirmed focus stays put.
