@@ -89,19 +89,27 @@ export async function getShelvesFor(
   return Object.fromEntries(rows.map((row) => [row.workId, row.shelf]));
 }
 
+// A shelved book: the Book fields plus whatever progress is stored. Values are
+// null when nothing has been logged. Assignable to Book.
+export type ShelvedBook = Book & {
+  currentPage: number | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+};
+
 // Every shelved book, grouped by shelf. All three keys are always present.
 // One query, newest update first, work id breaking ties so the order is stable.
 // Database errors are thrown, not swallowed.
 export async function getShelvedBooks(
   db: Db = getDb(),
-): Promise<Record<Shelf, Book[]>> {
+): Promise<Record<Shelf, ShelvedBook[]>> {
   const rows = await db
     .select()
     .from(books)
     .orderBy(desc(books.updatedAt), asc(books.workId));
   const grouped = Object.fromEntries(
-    SHELVES.map((shelf) => [shelf, [] as Book[]]),
-  ) as Record<Shelf, Book[]>;
+    SHELVES.map((shelf) => [shelf, [] as ShelvedBook[]]),
+  ) as Record<Shelf, ShelvedBook[]>;
   for (const row of rows) {
     grouped[row.shelf].push({
       id: row.workId,
@@ -109,6 +117,9 @@ export async function getShelvedBooks(
       authors: row.authors,
       year: row.year,
       coverId: row.coverId,
+      currentPage: row.currentPage,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt,
     });
   }
   return grouped;

@@ -12,7 +12,7 @@ vi.mock("@/lib/db/client", async (importOriginal) => ({
   getDb: () => ctx.db,
 }));
 
-import { setCurrentPageAction } from "./shelves";
+import { setCurrentPageAction, setShelfAction } from "./shelves";
 
 const dune = {
   id: "/works/OL45804W",
@@ -38,6 +38,21 @@ describe("setCurrentPageAction against a real database", () => {
 
     expect(result).toStrictEqual({ ok: false });
     const shelves = await getShelvedBooks(ctx.db);
-    expect(shelves.want_to_read[0]).not.toHaveProperty("currentPage", 42);
+    expect(shelves.want_to_read).toHaveLength(1);
+    expect(shelves.want_to_read[0].currentPage).toBeNull();
+  });
+
+  it("setShelfAction accepts a ShelvedBook and strips the progress keys", async () => {
+    await setShelf(dune, "reading", ctx.db);
+    await setCurrentPageAction({ workId: dune.id, page: 7 });
+    const shelved = (await getShelvedBooks(ctx.db)).reading[0];
+    expect(shelved.currentPage).toBe(7);
+
+    const result = await setShelfAction({ book: shelved, shelf: "finished" });
+
+    expect(result).toStrictEqual({ ok: true, shelf: "finished" });
+    const after = await getShelvedBooks(ctx.db);
+    expect(after.finished.map((b) => b.id)).toEqual([dune.id]);
+    expect(after.finished[0].currentPage).toBe(7);
   });
 });
