@@ -54,7 +54,7 @@ describe("setShelf", () => {
         addedAt: 1000,
         updatedAt: 1000,
         currentPage: null,
-        startedAt: null,
+        startedAt: 1000,
         finishedAt: null,
       },
     ]);
@@ -81,8 +81,8 @@ describe("setShelf", () => {
         addedAt: 1000,
         updatedAt: 2000,
         currentPage: null,
-        startedAt: null,
-        finishedAt: null,
+        startedAt: 1000,
+        finishedAt: 2000,
       },
     ]);
   });

@@ -65,6 +65,9 @@ Bigger features belong in `docs/ROADMAP.md`.
 | Pages read needs a page count | `src/lib/open-library.ts`, `src/lib/book.ts` | Feature #4 stores a current page with no total, so there's no percentage. For #6, either take `number_of_pages_median` from Open Library or let the user enter a total. | Reading progress, planner |
 | Removing a Finished book drops it from the stats | `src/app/actions/shelves.ts` | Removal is a hard delete, so its progress and finish date go too. Decide before #6 whether stats should count removed books. | Reading progress, planner |
 | Edit start and finish dates by hand | `src/lib/shelves.ts` | Finished → Reading → Finished resets the finish date to today. Add an edit option later. | Reading progress, planner |
+| Type the `'finished'` literal in the finish-date CASE | `src/lib/shelves.ts:48` | It's a raw string the type checker can't link to `SHELVES`. Renaming the shelf would silently break the finish-date logic. | Reading progress, Task 2 review |
+| Leave unchanged date columns out of the upsert set | `src/lib/shelves.ts:45`, `:49` | `col = col` does nothing. Dropping those keys would make the statement shorter. | Reading progress, Task 2 review |
+| Trim `shelves.dates.test.ts` | `src/lib/shelves.dates.test.ts` | About 180 lines, past the 150-line guideline. The "addedAt never changes" loop at `:151` overlaps with the "updates in place" test in `shelves.test.ts`. | Reading progress, Task 2 review |
 | Searches before the JavaScript loads do a full page load | `src/components/search-form.tsx` | If you press Enter within about a second of a slow page load, the browser does a plain GET request. There's no pending state and the box is briefly blank. This is the plain HTML form working without JavaScript, which is fine. Worth knowing if it ever looks odd. | Book search, Task 4 verifier |
 
 ## Done
