@@ -1,4 +1,4 @@
-import { desc, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, type Db } from "./db/client";
 import { books } from "./db/schema";
 import type { Book } from "./open-library";
@@ -58,6 +58,22 @@ export async function removeFromShelf(
   db: Db = getDb(),
 ): Promise<void> {
   await db.delete(books).where(eq(books.workId, workId));
+}
+
+// Saves the current page for a book on the Reading shelf. Returns true when a
+// row changed, false when the book is not shelved or is on another shelf.
+// Only currentPage is written: updatedAt stays, so shelf ordering is unchanged.
+// Database errors are thrown, not swallowed.
+export async function setCurrentPage(
+  workId: string,
+  page: number,
+  db: Db = getDb(),
+): Promise<boolean> {
+  const result = await db
+    .update(books)
+    .set({ currentPage: page })
+    .where(and(eq(books.workId, workId), eq(books.shelf, "reading")));
+  return result.rowsAffected > 0;
 }
 
 // Maps work id to shelf for the ids that are shelved. Unshelved ids are absent.

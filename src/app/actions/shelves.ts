@@ -3,8 +3,9 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { bookSchema } from "@/lib/book";
+import { MAX_CURRENT_PAGE } from "@/lib/book-limits";
 import { SHELVES, type Shelf } from "@/lib/shelf";
-import { removeFromShelf, setShelf } from "@/lib/shelves";
+import { removeFromShelf, setCurrentPage, setShelf } from "@/lib/shelves";
 
 const inputSchema = z.object({ book: bookSchema, shelf: z.enum(SHELVES) });
 
@@ -52,4 +53,34 @@ export async function removeFromShelfAction(
   // Outside the try so Next's own errors are never swallowed.
   refresh();
   return { ok: true };
+}
+
+const pageInputSchema = z.object({
+  workId: bookSchema.shape.id,
+  page: z.number().int().min(1).max(MAX_CURRENT_PAGE),
+});
+
+export type SetCurrentPageResult = { ok: true; page: number } | { ok: false };
+
+// Same contract as the other actions. A book that is not on Reading is a
+// plain `{ ok: false }`, not logged: it is not a database error.
+export async function setCurrentPageAction(
+  input: unknown,
+): Promise<SetCurrentPageResult> {
+  const parsed = pageInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false };
+  const { workId, page } = parsed.data;
+
+  let changed: boolean;
+  try {
+    changed = await setCurrentPage(workId, page);
+  } catch (error) {
+    console.error("setCurrentPageAction: could not save page", error);
+    return { ok: false };
+  }
+  if (!changed) return { ok: false };
+
+  // Outside the try so Next's own errors are never swallowed.
+  refresh();
+  return { ok: true, page };
 }

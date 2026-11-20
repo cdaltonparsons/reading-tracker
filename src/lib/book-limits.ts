@@ -4,3 +4,4 @@
 export const MAX_TITLE_LENGTH = 1000;
 export const MAX_AUTHORS = 50;
 export const MAX_AUTHOR_LENGTH = 500;
+export const MAX_CURRENT_PAGE = 100_000;
